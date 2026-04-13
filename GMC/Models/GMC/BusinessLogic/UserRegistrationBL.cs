@@ -1,0 +1,25 @@
+using GMC.DAL.Repository.GMC;
+using GMC.Models.GMC;
+
+namespace GMC.Models.GMC.BusinessLogic
+{
+    public interface IUserRegistrationBL
+    {
+        bool RegisterUser(UserRegistrationModel user);
+    }
+
+    public class UserRegistrationBL : IUserRegistrationBL
+    {
+        private readonly IUserRegistrationRepo _repo;
+
+        public UserRegistrationBL(IUserRegistrationRepo repo)
+        {
+            _repo = repo;
+        }
+
+        public bool RegisterUser(UserRegistrationModel user)
+        {
+            return _repo.RegisterUser(user);
+        }
+    }
+}

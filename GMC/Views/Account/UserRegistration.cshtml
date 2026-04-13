@@ -1,0 +1,80 @@
+@model GMC.Models.GMC.UserRegistrationModel
+
+@{
+    ViewData["Title"] = "User Registration";
+    Layout = "~/Views/Shared/_LayoutNew.cshtml";
+}
+
+<div class="card shadow-sm p-4 bg-white rounded">
+    <div class="card-body">
+        <h2 class="text-center mb-4" style="color: #034ea2; font-weight: bold;">User Registration</h2>
+        
+        @if (ViewBag.Success != null)
+        {
+            <div class="alert alert-success text-center">@ViewBag.Success</div>
+        }
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger text-center">@ViewBag.Error</div>
+        }
+
+        <form asp-action="UserRegistration" method="post">
+            <div class="row mb-3">
+                <div class="col-md-6 form-group">
+                    <label asp-for="Username" class="fw-bold"></label>
+                    <input asp-for="Username" class="form-control" placeholder="Enter standard unique username" />
+                    <span asp-validation-for="Username" class="text-danger"></span>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label asp-for="Password" class="fw-bold"></label>
+                    <input asp-for="Password" class="form-control" type="password" placeholder="Create a password" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6 form-group">
+                    <label asp-for="Name" class="fw-bold"></label>
+                    <input asp-for="Name" class="form-control" placeholder="Full name of user" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label asp-for="emailid" class="fw-bold">Email ID</label>
+                    <input asp-for="emailid" class="form-control" type="email" placeholder="example@domain.com" />
+                    <span asp-validation-for="emailid" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6 form-group">
+                    <label asp-for="mobile" class="fw-bold">Mobile</label>
+                    <input asp-for="mobile" class="form-control" type="tel" placeholder="Phone Number" />
+                    <span asp-validation-for="mobile" class="text-danger"></span>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label asp-for="usertype" class="fw-bold">User Type</label>
+                    <select asp-for="usertype" class="form-select form-control" asp-items="ViewBag.Roles">
+                        <option value="">-- Select Type --</option>
+                    </select>
+                    <span asp-validation-for="usertype" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-12 form-group">
+                    <label asp-for="address" class="fw-bold">Address</label>
+                    <textarea asp-for="address" class="form-control" rows="3" placeholder="Residential or Office Address..."></textarea>
+                    <span asp-validation-for="address" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary px-5 py-2 fw-bold" style="background-color: #034ea2; font-size: 1.1rem; border-radius: 8px;">Register User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
