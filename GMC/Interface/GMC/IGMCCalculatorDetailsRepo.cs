@@ -24,6 +24,7 @@ namespace GMC.Interface.GMC
         Task<DataTable> BindVersionDetails(string PolicyNo);
         Task<DataTable> GetGMCPolicyLevelData(string PolicyNo);
         Task<DataTable> GetGMCRolloverLiveData(string PolicyNo);
+        Task<DataSet> GetTrendAnalysis(string PolicyNo, string FYYear);
 
     }
 }

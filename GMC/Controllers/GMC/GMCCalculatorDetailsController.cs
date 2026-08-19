@@ -10,8 +10,7 @@ using GMC.Models.GMC;
 
 namespace GMC.Controllers.GMC
 {
-    //[Authorize]
-    
+    [RoleAuth("Calculator", "Underwriter", "Admin")]
     public class GMCCalculatorDetailsController : Controller
     {
         readonly IGMCCalculatorDetails _cal;
@@ -27,6 +26,63 @@ namespace GMC.Controllers.GMC
         {
             return View();
         }
+
+        /// <summary> Trend Analysis report (UW year trend, relationship and disease breakups). </summary>
+        public async Task<IActionResult> TrendAnalysis(string policyno, string fyyear)
+        {
+            var model = new TrendAnalysisModel
+            {
+                PolicyNo = policyno?.Trim(),
+                FYYear   = fyyear?.Trim()
+            };
+
+            DataSet ds = await _cal.GetTrendAnalysis(model.PolicyNo, model.FYYear);
+            if (ds.Tables.Count >= 7)
+            {
+                model.dtTrend        = ds.Tables[0];
+                model.dtParties      = ds.Tables[1];
+                model.dtRelationship = ds.Tables[2];
+                model.dtDisease      = ds.Tables[3];
+                model.dtEnrollLives  = ds.Tables[4];
+                model.AvailableYears = ds.Tables[5].Rows.Cast<DataRow>()
+                    .Select(r => r["UWYear"]?.ToString() ?? "").Where(y => y != "").ToList();
+                model.AvailablePolicies = ds.Tables[6].Rows.Cast<DataRow>()
+                    .Select(r => r["PolicyNo"]?.ToString()?.Trim() ?? "").Where(p => p != "").ToList();
+            }
+            return View(model);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadTrendAnalysisExcel(string policyno, string fyyear)
+        {
+            policyno = policyno?.Trim();
+            fyyear = fyyear?.Trim();
+            if (string.IsNullOrWhiteSpace(policyno) && string.IsNullOrWhiteSpace(fyyear))
+                return BadRequest("Select a policy number or a financial year.");
+
+            DataSet ds = await _cal.GetTrendAnalysis(policyno, fyyear);
+            if (ds.Tables.Count < 7
+                || (ds.Tables[0].Rows.Count == 0 && ds.Tables[4].Rows.Count == 0))
+                return NotFound("No Trend Analysis data was found for the selected policy and financial year.");
+
+            if (!string.IsNullOrWhiteSpace(fyyear)
+                && !ds.Tables[5].Rows.Cast<DataRow>()
+                    .Any(r => string.Equals(r["UWYear"]?.ToString(), fyyear,
+                        StringComparison.OrdinalIgnoreCase)))
+                return BadRequest("Select a financial year from the Financial Year Master.");
+
+            var policyLabel = string.IsNullOrWhiteSpace(policyno) ? "All Policies" : policyno;
+            var bytes = TrendAnalysisExcelExporter.Build(ds, policyLabel, fyyear);
+            var safePolicy = string.Concat(policyLabel.Select(ch =>
+                Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)).Replace(' ', '_');
+            var yearPart = string.IsNullOrWhiteSpace(fyyear) ? "All_Years" : fyyear;
+            var fileName = $"Trend_Analysis_{safePolicy}_{yearPart}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            return File(bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName);
+        }
+
         public async Task<IActionResult> getCalclutaorFactor([FromForm] string Sdata, [FromForm] string finalEnrollMentPrem,
             [FromForm] string ClaimCostData
             , [FromForm] IFormFile myfileName, [FromForm] IFormFile fileName1, [FromForm] string policyno, [FromForm] string AverageLives
@@ -1630,11 +1686,13 @@ namespace GMC.Controllers.GMC
             return Content(result);
         }
       
-        public async Task<IActionResult> GMCCalculatorpremium(string policyno)
+        public async Task<IActionResult> GMCCalculatorpremium(string policyno, int? uploadId = null)
         {
             GMCCalculatorDetailsModel model = new GMCCalculatorDetailsModel();
             DataTable dt = await _cal.GetGMCPolicyLevelData(policyno);
             DataTable dtLiv = await _cal.GetGMCRolloverLiveData(policyno);
+            int closingLives = dtLiv.Rows.Count > 0 ? Convert.ToInt32(dtLiv.Rows[0]["ClosingLives"]) : 0;
+            int closingEmp   = dtLiv.Rows.Count > 0 ? Convert.ToInt32(dtLiv.Rows[0]["ClosingEmp"]) : 0;
             if (dt.Rows.Count>0)
             {
                 model.PolicyStartDate = dt.Rows[0]["PolicyStartDate"].ToString() == "" ? DateTime.Now.Date : validateDate(dt.Rows[0]["PolicyStartDate"].ToString());
@@ -1643,8 +1701,8 @@ namespace GMC.Controllers.GMC
                 model.PolicyNo = dt.Rows[0]["PolicyNo"].ToString();
                 model.dtVersion = await _cal.BindVersionDetails(policyno);
                 model.versionDatalist = DataTableToList.ConvertDataTableToListForCommon<versionData>(model.dtVersion);
-                model.ClosingLives = Convert.ToInt32(dtLiv.Rows[0]["ClosingLives"].ToString());
-                model.ClosingEmployee = Convert.ToInt32(dtLiv.Rows[0]["ClosingEmp"].ToString());
+                model.ClosingLives = closingLives;
+                model.ClosingEmployee = closingEmp;
                 return View(model);
             }
             model.PolicyStartDate = DateTime.Now.Date;
@@ -1653,8 +1711,8 @@ namespace GMC.Controllers.GMC
             model.PolicyNo = policyno;
             model.dtVersion = await _cal.BindVersionDetails(policyno);
             model.versionDatalist = DataTableToList.ConvertDataTableToListForCommon<versionData>(model.dtVersion);
-            model.ClosingLives = Convert.ToInt32(dtLiv.Rows[0]["ClosingLives"].ToString());
-            model.ClosingEmployee = Convert.ToInt32(dtLiv.Rows[0]["ClosingEmp"].ToString());
+            model.ClosingLives = closingLives;
+            model.ClosingEmployee = closingEmp;
             return View(model);
 
         }
@@ -1826,44 +1884,15 @@ namespace GMC.Controllers.GMC
         {
             try
             {
-                string FileName = "";
-               // var userid = "SA_DWHREPORT";
-               // var password = "Dw3R!h0use@2201";
-               // var domain = "RGISMTPGW";
-               // ServerReport report = new ServerReport();
+                var response = await _cal.DownloadSummeryVersionDetailsToControls(Policyno, version);
+                if (string.IsNullOrWhiteSpace(response.excelfileName))
+                    response.error = "No summary data found for this policy/version.";
 
-                // report.ReportServerCredentials.NetworkCredentials = new NetworkCredential(userid, password, domain);
-                // report.ReportServerUrl = new Uri("http://dwhproddb02:81/ReportServer");
-                // report.ReportPath = "/sdo_Report/summary_telesales";
-                // report.Refresh();
-                // report.SetParameters(new[] { new ReportParameter("PolicyNo", Policyno) });
-                // report.SetParameters(new[] { new ReportParameter("versionno", version) });
-                // string mimeType, encoding, fileNameExtension, deviceInfo, reportType;
-                // reportType = "Excel";
-                // deviceInfo = "<DeviceInfo>";
-                // deviceInfo = deviceInfo + "  <OutputFormat>Excel</OutputFormat>";
-                // deviceInfo = deviceInfo + "</DeviceInfo>";
-                // Microsoft.Reporting.NETCore.Warning[] warnings;
-                // string[] streams;
-                // byte[] renderedBytes = report.Render(reportType, deviceInfo, out mimeType, out encoding, out fileNameExtension, out streams, out warnings);
-                //string DownloadDt = DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt", CultureInfo.CreateSpecificCulture("en-US"));
-                // DownloadDt = DownloadDt.Replace(" ", "_");
-                // DownloadDt = DownloadDt.Replace(":", "_");
-                // string FileNameRedirect = "Summery" + "_" + Policyno + "_at_" + DownloadDt + ".xls";
-
-                // string FileName = Path.Combine(this._hosting.WebRootPath, @"ReportDownload\" + FileNameRedirect);
-                // FileStream fs = new FileStream(FileName, FileMode.Create, FileAccess.Write, FileShare.Write);
-                // fs.Write(renderedBytes, 0, renderedBytes.Length);
-                // fs.Close();
-                return Json(FileName);
-                //var data = "data:application/pdf;base64," + Convert.ToBase64String(pdf);
-                //var resultData = JsonConvert.SerializeObject(new { data = data });
-                //return Content(resultData);
+                return Json(response);
             }
-            catch (Exception ee)
+            catch
             {
-
-                throw ee;
+                throw;
             }
 
 

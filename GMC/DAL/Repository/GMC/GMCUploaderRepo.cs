@@ -48,14 +48,45 @@ namespace GMC.DAL.Repository.GMC
 
         public List<string> getSearchInsuraceCompanyName(string prifix)
         {
-            List<string> result = _sql.GetExecuteReader(con, "select company_name from tbl_company_list with(nolock)  where company_name like '" + prifix + "%'", "company_name");
+            // Defence-in-depth: the underlying SqlHelperQuery does not expose a
+            // parameterised reader, so we sanitise the autocomplete prefix to a
+            // conservative alphanumeric subset before composing the LIKE clause.
+            var safe = SanitisePrefix(prifix);
+            if (string.IsNullOrEmpty(safe)) return new List<string>();
+            List<string> result = _sql.GetExecuteReader(con,
+                "select company_name from tbl_company_list with(nolock) where company_name like '" + safe + "%'",
+                "company_name");
             return result;
         }
 
         public List<string> getSearchTPA(string prifix)
         {
-            List<string> result = _sql.GetExecuteReader(con, "select TPA_Name from tbl_TPA_list with(nolock)  where TPA_Name  like '" + prifix + "%'", "TPA_Name");
+            var safe = SanitisePrefix(prifix);
+            if (string.IsNullOrEmpty(safe)) return new List<string>();
+            List<string> result = _sql.GetExecuteReader(con,
+                "select TPA_Name from tbl_TPA_list with(nolock) where TPA_Name like '" + safe + "%'",
+                "TPA_Name");
             return result;
+        }
+
+        /// <summary>
+        /// Keeps only letters, digits, spaces, hyphens and ampersands — the
+        /// characters reasonable to find inside company / TPA names.  Anything
+        /// else (single-quote, semicolon, brackets, control chars …) is dropped.
+        /// </summary>
+        private static string SanitisePrefix(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+            raw = raw.Trim();
+            if (raw.Length > 64) raw = raw[..64];
+            var buf = new char[raw.Length];
+            int n = 0;
+            foreach (var c in raw)
+            {
+                if (char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '&' || c == '.')
+                    buf[n++] = c;
+            }
+            return new string(buf, 0, n);
         }
 
         public async Task<GMCUploaderModel> uploadData(GMCUploaderModel model)

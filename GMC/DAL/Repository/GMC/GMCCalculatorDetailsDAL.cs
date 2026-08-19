@@ -835,9 +835,10 @@ namespace GMC.DAL.Repository.GMC
 
             try
             {
-                cmd.CommandText = "udsp_getAllSummaryData";
+                cmd.CommandText = "udsp_GetGMC_DownloadSummary";
                 cmd.Parameters.Add("@policyno", SqlDbType.VarChar).Value = (Policyno);
-               // cmd.Parameters.Add("@VersionNumber", SqlDbType.VarChar).Value = (VersionNumber);
+                cmd.Parameters.Add("@VersionNumber", SqlDbType.VarChar).Value =
+                    string.IsNullOrWhiteSpace(VersionNumber) ? DBNull.Value : VersionNumber;
                 cmd.Connection = conn_sales;//conn;
                 await conn_sales.OpenAsync();
                 cmd.CommandType = CommandType.StoredProcedure;
@@ -911,6 +912,34 @@ namespace GMC.DAL.Repository.GMC
                 ds1.Dispose();
                 adapter.Dispose();
                await conn_sales.CloseAsync();
+                conn_sales.Dispose();
+            }
+        }
+        public async Task<DataSet> GetTrendAnalysis(string PolicyNo, string FYYear)
+        {
+            SqlConnection conn_sales = new SqlConnection(_configuration["ConnectionStrings:ConnectionToTele_Dashboard"].ToString());
+            SqlDataAdapter adapter = new SqlDataAdapter();
+            DataSet ds1 = new DataSet();
+            SqlCommand cmd = new SqlCommand();
+            try
+            {
+                cmd.CommandText = "udsp_GetGMC_TrendAnalysis";
+                cmd.Parameters.Add("@PolicyNo", SqlDbType.VarChar).Value =
+                    string.IsNullOrWhiteSpace(PolicyNo) ? DBNull.Value : PolicyNo;
+                cmd.Parameters.Add("@FYYear", SqlDbType.VarChar).Value =
+                    string.IsNullOrWhiteSpace(FYYear) ? DBNull.Value : FYYear;
+                cmd.Connection = conn_sales;
+                await conn_sales.OpenAsync();
+                cmd.CommandType = CommandType.StoredProcedure;
+                adapter = new SqlDataAdapter(cmd);
+                adapter.SelectCommand.CommandTimeout = 0;
+                adapter.Fill(ds1);
+                return ds1;
+            }
+            finally
+            {
+                adapter.Dispose();
+                await conn_sales.CloseAsync();
                 conn_sales.Dispose();
             }
         }

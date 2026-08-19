@@ -351,6 +351,173 @@ namespace GMC.Helper
             }
 
         }
+
+        /// <summary>
+        /// Builds the compact underwriting summary used by the GMC Calculator.
+        /// The eight result sets are returned by dbo.udsp_GetGMC_DownloadSummary.
+        /// </summary>
+        public void EPPlusExportGmcSummary(DataSet ds, string tempFile)
+        {
+            if (ds.Tables.Count < 8)
+                throw new InvalidOperationException(
+                    "The GMC summary procedure did not return all required result sets.");
+
+            var directory = Path.GetDirectoryName(tempFile);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+
+            using var package = new ExcelPackage();
+            var ws = package.Workbook.Worksheets.Add("GMC Summary");
+            ws.View.ShowGridLines = false;
+
+            WriteKeyValueSummarySection(ws, "Policy Details", ds.Tables[0], 1, 1, 3);
+            WriteKeyValueSummarySection(ws, "Policy Features", ds.Tables[1], 10, 1, 3);
+            WriteSummaryTable(ws, "Relationship wise lives", ds.Tables[2], 1, 6);
+            WriteKeyValueSummarySection(ws, "Demographic Parameters", ds.Tables[3], 10, 6, 2);
+            WriteSummaryTable(ws, "Paid Claims", ds.Tables[4], 18, 6);
+            WriteSummaryTable(ws, "Outstanding Claims", ds.Tables[5], 23, 1);
+            WriteKeyValueSummarySection(ws, "IBNR Working", ds.Tables[6], 23, 6, 2);
+
+            // Burn details follow the policy/claim summary as requested.
+            WriteSummaryTable(ws, "Burn Details", ds.Tables[7], 32, 1);
+
+            ws.Cells[ws.Dimension.Address].Style.Font.Name = "Calibri";
+            ws.Cells[ws.Dimension.Address].Style.Font.Size = 10;
+            ws.Cells[ws.Dimension.Address].AutoFitColumns(11, 24);
+            ws.Column(1).Width = 23;
+            ws.Column(2).Width = 19;
+            ws.Column(3).Width = 18;
+            ws.Column(6).Width = 23;
+            ws.PrinterSettings.Orientation = eOrientation.Landscape;
+            ws.PrinterSettings.FitToPage = true;
+            ws.PrinterSettings.FitToWidth = 1;
+            ws.PrinterSettings.FitToHeight = 0;
+
+            package.SaveAs(new FileInfo(tempFile));
+        }
+
+        private static void WriteKeyValueSummarySection(
+            ExcelWorksheet ws, string title, DataTable table, int startRow, int startColumn, int width)
+        {
+            WriteSummaryTitle(ws, title, startRow, startColumn, width);
+            var row = startRow + 1;
+
+            foreach (DataRow dataRow in table.Rows)
+            {
+                var label = dataRow["FieldName"]?.ToString() ?? string.Empty;
+                var valueColumn = table.Columns.Contains("FieldValue") ? "FieldValue" : "NumericValue";
+                var value = dataRow[valueColumn] == DBNull.Value ? string.Empty : dataRow[valueColumn];
+
+                if (width > 2)
+                    ws.Cells[row, startColumn, row, startColumn + width - 2].Merge = true;
+
+                var labelCell = ws.Cells[row, startColumn];
+                labelCell.Value = label;
+                labelCell.Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+
+                var valueCell = ws.Cells[row, startColumn + width - 1];
+                valueCell.Value = value;
+                valueCell.Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                valueCell.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(255, 255, 153));
+
+                ApplySummaryBorder(ws.Cells[row, startColumn, row, startColumn + width - 1]);
+                if (value is decimal or double or float)
+                    valueCell.Style.Numberformat.Format =
+                        label.Contains('%') ? "0.0\\%" : "#,##0.0";
+                row++;
+            }
+        }
+
+        private static void WriteSummaryTable(
+            ExcelWorksheet ws, string title, DataTable table, int startRow, int startColumn)
+        {
+            // SortOrder is an internal positioning column and is not exported.
+            var columns = table.Columns.Cast<DataColumn>()
+                .Where(c => !string.Equals(c.ColumnName, "SortOrder", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var width = Math.Max(columns.Count, 1);
+
+            WriteSummaryTitle(ws, title, startRow, startColumn, width);
+
+            var headerRow = startRow + 1;
+            for (var colIndex = 0; colIndex < columns.Count; colIndex++)
+            {
+                var cell = ws.Cells[headerRow, startColumn + colIndex];
+                cell.Value = FriendlySummaryHeader(columns[colIndex].ColumnName);
+                cell.Style.Font.Bold = true;
+                cell.Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                cell.Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                cell.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(217, 225, 242));
+            }
+            ApplySummaryBorder(ws.Cells[headerRow, startColumn, headerRow, startColumn + width - 1]);
+
+            var rowIndex = headerRow + 1;
+            foreach (DataRow dataRow in table.Rows)
+            {
+                for (var colIndex = 0; colIndex < columns.Count; colIndex++)
+                {
+                    var column = columns[colIndex];
+                    var cell = ws.Cells[rowIndex, startColumn + colIndex];
+                    cell.Value = dataRow[column] == DBNull.Value ? null : dataRow[column];
+                    cell.Style.HorizontalAlignment = column.DataType == typeof(string)
+                        ? OfficeOpenXml.Style.ExcelHorizontalAlignment.Left
+                        : OfficeOpenXml.Style.ExcelHorizontalAlignment.Right;
+
+                    if (column.ColumnName.Contains("Pct", StringComparison.OrdinalIgnoreCase)
+                        || column.ColumnName.Contains("Ratio", StringComparison.OrdinalIgnoreCase))
+                        cell.Style.Numberformat.Format = "0.0\\%";
+                    else if (column.ColumnName.Contains("Amount", StringComparison.OrdinalIgnoreCase)
+                             || column.ColumnName.Equals("ACS", StringComparison.OrdinalIgnoreCase))
+                        cell.Style.Numberformat.Format = "#,##0";
+                }
+
+                if (string.Equals(dataRow[columns[0]]?.ToString(), "Total", StringComparison.OrdinalIgnoreCase))
+                    ws.Cells[rowIndex, startColumn, rowIndex, startColumn + width - 1].Style.Font.Bold = true;
+
+                ApplySummaryBorder(ws.Cells[rowIndex, startColumn, rowIndex, startColumn + width - 1]);
+                rowIndex++;
+            }
+        }
+
+        private static void WriteSummaryTitle(
+            ExcelWorksheet ws, string title, int row, int column, int width)
+        {
+            ws.Cells[row, column, row, column + width - 1].Merge = true;
+            var range = ws.Cells[row, column, row, column + width - 1];
+            range.Value = title;
+            range.Style.Font.Bold = true;
+            range.Style.Font.Color.SetColor(System.Drawing.Color.White);
+            range.Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+            range.Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+            range.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(0, 45, 98));
+            ApplySummaryBorder(range);
+        }
+
+        private static void ApplySummaryBorder(ExcelRange range)
+        {
+            range.Style.Border.Top.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+            range.Style.Border.Bottom.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+            range.Style.Border.Left.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+            range.Style.Border.Right.Style = OfficeOpenXml.Style.ExcelBorderStyle.Thin;
+        }
+
+        private static string FriendlySummaryHeader(string name)
+        {
+            return name switch
+            {
+                "MixPct" => "% Mix",
+                "AmountPct" => "Amt%",
+                "CountPct" => "Count%",
+                "PaidRatio" => "Paid Ratio",
+                "ClaimCount" => "Count",
+                "ClaimedAmount" => "Claimed Amt",
+                "PaidAmount" => "Paid Amt",
+                "OutstandingAmount" => "O/s Amt",
+                "NoOfClaims" => "No. of Claims",
+                _ => name
+            };
+        }
+
         public void EPPlusExport(DataSet ds, string TempFile)
         {
             var random = new Random();

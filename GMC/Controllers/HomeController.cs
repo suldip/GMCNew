@@ -15,7 +15,17 @@ namespace GMC.Controllers
 
         public IActionResult Index()
         {
-            return View();
+            var userName = HttpContext.Session.GetString("UserName");
+            if (string.IsNullOrEmpty(userName))
+                return RedirectToAction("Login", "Account");
+
+            var role = HttpContext.Session.GetString("UserRole");
+            return role switch
+            {
+                "SalesPerson" => RedirectToAction("Upload",  "SalesUpload"),
+                "Underwriter" => RedirectToAction("Pending", "Underwriter"),
+                _              => RedirectToAction("Index",   "Dashboard")
+            };
         }
 
         public IActionResult Privacy()

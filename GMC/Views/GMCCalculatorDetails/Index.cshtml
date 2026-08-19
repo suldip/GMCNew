@@ -2,126 +2,63 @@
 @using GMC.Models.GMC
 @using System.Data
 @{
-
-    Layout = "~/Views/Shared/_LayoutNew.cshtml";
+    ViewData["Title"] = "GMC Calculator Details";
+    Layout = "_LayoutModern";
 }
-<link href="@Url.Content("~/css/CommonCss.css")" rel="stylesheet" />
-<script>
 
-    $(document).ready(function () {
-
-        $("#divLoading").hide();
-        $("#idmaster").hide();
-        $("#tbl").hide();
-        $('#idpolicy').prop('disabled', true)
-        $('#idpName').prop('disabled', true)
-        $('#btnSearch').prop('disabled', true)
-
-    });
-     function checkDatatable() {
-
-        if ($.fn.dataTable.isDataTable('#tblTable')) {
-            table = $('#tblTable').DataTable();
-            table.destroy();
-
-        }
-
-    }
-</script>
+@section Styles {
+<link href="~/css/jquery.dataTables.min.css" rel="stylesheet" asp-append-version="true" />
+<link href="~/css/fixedHeader.dataTables.min.css" rel="stylesheet" asp-append-version="true" />
 <style>
-    .row {
-        margin-bottom: 0px !important;
-    }
-
     #divLoading {
         position: fixed;
-        top: 50%;
-        left: 50%;
+        inset: 0;
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.45);
+    }
+
+    .gmc-calc-page .row { margin-bottom: 0 !important; }
+    .gmc-calc-page .form-group { margin-bottom: 1rem; }
+    .gmc-calc-page label { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+    .gmc-calc-page .form-control { font-size: 14px; }
+
+    .gmc-calc-page .table thead th {
+        background: #f1f5f9;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        vertical-align: middle;
+    }
+
+    .gmc-calc-page .filters th input {
         width: 100%;
-        height: 100%;
-        transform: translate(-50%, -50%);
-        transform: -webkit-translate(-50%, -50%);
-        transform: -moz-translate(-50%, -50%);
-        transform: -ms-translate(-50%, -50%);
-        z-index: 999;
-        text-align: center;
-        padding-top: 30em;
-        background-color: transparent;
-        background: radial-gradient(rgba(10, 10, 10,.4), rgba(0, 0, 0, .8));
+        border: 1px solid var(--gmc-border);
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 400;
+        text-transform: none;
+        letter-spacing: normal;
     }
 
-    input[type="date"]::-webkit-calendar-picker-indicator {
-        color: rgba(0, 0, 0, 0);
-        opacity: 1;
-        display: block;
-        background: url('calender.png') no-repeat;
-        width: 10px;
-        height: 10px;
-        border-width: thin;
-    }
-
-    h1.pageTitle {
-        color: #034ea2;
-        font-size: 18px !important;
-        margin-top: 0px;
-    }
-
-    .ContainerMarginMinus {
-        margin: 0px !important;
-    }
-
-    .multiselect-selected-text {
-        float: left;
-    }
-
-    #drpZone {
-        max-height: 200px;
-        overflow: auto;
-    }
-
-    .disabledbutton {
+    .gmc-calc-page .disabledbutton {
         pointer-events: none;
         opacity: 0.4;
     }
-
-
-    button.dropdown-toggle::after {
-        display: none;
-    }
-
-
-
-    ul.multiselect-container {
-        margin-top: 0em !important;
-        max-height: 160px !important;
-        width: 100% !important;
-    }
-
-    button.multiselect {
-        width: 100% !important;
-    }
-
-    ul.dropdown-menu {
-        margin-top: 0em !important;
-        max-height: 160px !important;
-        width: 100% !important;
-    }
-
-    .caret {
-        display: none !important;
-    }
 </style>
-<div class="formContainer ContainerMarginMinus">
-    <h1 class="pageTitle ContainerMarginMinus">
-        GMC Calculator Details
+}
 
-    </h1>
+<div class="gmc-calc-page">
+    <div class="gmc-card">
+        <h5 class="gmc-card-title"><i class="bi bi-calculator"></i> GMC Calculator Details</h5>
     <div id="divMain">
-        <div class="card shadow-lg p-5 bg-white rounded">
-            <div class="card-body">
+        <div>
+            <div>
                 <div id="divLoading">
-                    <img src='@Url.Content("~/Images/icons8-spinner.gif")' width="50" height="50" />
-
+                    <div class="spinner-border text-light" role="status" style="width:3rem;height:3rem;"></div>
                 </div>
                  <form asp-action="Index" asp-controller="GMCUploader" enctype="multipart/form-data" method="post" id="theForm1">
                     <input id="tnames" type="hidden" asp-for="tablename" />
@@ -190,6 +127,27 @@
         </div>
         </div>
         </div>
+</div>
+
+@section Scripts {
+<script src="~/js/jquery.dataTables.min.js" asp-append-version="true"></script>
+<script src="~/js/dataTables.fixedHeader.min.js" asp-append-version="true"></script>
+<script>
+    $(document).ready(function () {
+        $("#divLoading").hide();
+        $("#idmaster").hide();
+        $("#tbl").hide();
+        $('#idpolicy').prop('disabled', true)
+        $('#idpName').prop('disabled', true)
+        $('#btnSearch').prop('disabled', true)
+    });
+    function checkDatatable() {
+        if ($.fn.dataTable.isDataTable('#tblTable')) {
+            table = $('#tblTable').DataTable();
+            table.destroy();
+        }
+    }
+</script>
 <script>
     $("#drpbussi").change(function () {
         //debugger
@@ -349,4 +307,4 @@
     }
 
 </script>
-        
+}

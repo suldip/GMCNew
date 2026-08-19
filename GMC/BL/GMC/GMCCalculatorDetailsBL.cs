@@ -56,6 +56,11 @@ namespace GMC.BL.GMC
             return await _cal.GetGMCPolicyLevelData(PolicyNo);
         }
 
+        public async Task<DataSet> GetTrendAnalysis(string PolicyNo, string FYYear)
+        {
+            return await _cal.GetTrendAnalysis(PolicyNo, FYYear);
+        }
+
         public async Task<DataTable> GetGMCRolloverLiveData(string PolicyNo)
         {
             return await _cal.GetGMCRolloverLiveData(PolicyNo);

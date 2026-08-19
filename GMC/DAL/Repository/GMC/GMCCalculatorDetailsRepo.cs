@@ -73,14 +73,16 @@ namespace GMC.DAL.Repository.GMC
                 string DownloadDt = DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt", CultureInfo.CreateSpecificCulture("en-US"));
                 DownloadDt = DownloadDt.Replace(" ", "_");
                 DownloadDt = DownloadDt.Replace(":", "_");
-                string FileNameRedirect = "GMC_Quotes" + "_at_" + DownloadDt;
-                FileNameRedirect = "Summery" + "_" + Policyno + "_at_" + DownloadDt + ".xlsx";
+                string FileNameRedirect = "GMC_Summary" + "_" +
+                    string.Join("_", Policyno.Split(Path.GetInvalidFileNameChars(),
+                        StringSplitOptions.RemoveEmptyEntries)) + "_" + VersionNumber + "_at_" + DownloadDt + ".xlsx";
                 string uploadpath = Path.Combine(this._hosting.WebRootPath, @"ReportDownload\");
+                Directory.CreateDirectory(uploadpath);
                 string FileName = uploadpath + FileNameRedirect;
                 DataSet ds = await _DAL.DownloadRenewalSummeryVersionDetails(Policyno, VersionNumber);
-                if (ds.Tables[0].Rows.Count > 0)
+                if (ds.Tables.Count >= 8 && ds.Tables[0].Rows.Count > 0)
                 {
-                    _cBAL.EPPlusExport1(ds, FileName);
+                    _cBAL.EPPlusExportGmcSummary(ds, FileName);
                     model.excelfileName = FileName;
                     return model;
                 }
@@ -121,6 +123,11 @@ namespace GMC.DAL.Repository.GMC
         public async Task<DataTable> GetGMCPolicyLevelData(string PolicyNo)
         {
             return await _DAL.GetGMCPolicyLevelData(PolicyNo);
+        }
+
+        public async Task<DataSet> GetTrendAnalysis(string PolicyNo, string FYYear)
+        {
+            return await _DAL.GetTrendAnalysis(PolicyNo, FYYear);
         }
         public async Task<DataTable> GetGMCRolloverLiveData(string PolicyNo)
         {
